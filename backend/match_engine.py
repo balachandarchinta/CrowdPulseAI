@@ -1,12 +1,15 @@
 import random
 import time
-import asyncio
 from typing import Dict, Any
 
 class MatchSimulator:
     def __init__(self):
-        self.team1 = "India"
-        self.team2 = "Australia"
+        self.team1 = "CSK"
+        self.team2 = "LSG"
+        self.reset_match()
+
+    def reset_match(self):
+        """Resets the match to the start of the innings."""
         self.score = 0
         self.wickets = 0
         self.overs = 0
@@ -21,8 +24,12 @@ class MatchSimulator:
 
     def get_event(self) -> Dict[str, Any]:
         """Simulates a single ball and returns the event details."""
+        # Reset if match is over (20 overs or 10 wickets or target reached)
+        if self.overs >= 20 or self.wickets >= 10 or self.score >= self.target:
+            self.reset_match()
+
         outcomes = ["0", "1", "2", "3", "4", "6", "W", "WD", "NB"]
-        weights = [35, 25, 10, 2, 10, 8, 5, 3, 2]
+        weights = [35, 25, 10, 2, 10, 8, 4, 3, 2] # Reduced W weight slightly
         
         event_type = random.choices(outcomes, weights=weights)[0]
         
@@ -31,27 +38,27 @@ class MatchSimulator:
         
         if event_type == "W":
             self.wickets += 1
-            description = "OUT! A massive wicket for Australia! The stadium is stunned."
-            pulse_change = 45 if random.random() > 0.7 else -30 
+            description = f"OUT! A massive wicket! {self.team2} is striking back!"
+            pulse_change = -30 
             self.momentum -= 20
             self.pressure += 15
             self.win_prob -= 12
         elif event_type == "6":
             self.score += 6
-            description = "SIX! Deep into the stands! The roar is deafening!"
+            description = "SIX! Into the crowd! The Dhoni effect?"
             pulse_change = 60
             self.momentum += 15
             self.pressure -= 10
             self.win_prob += 8
         elif event_type == "4":
             self.score += 4
-            description = "FOUR! Exquisite timing. The crowd is on their feet!"
+            description = "FOUR! Piercing the gap. Beautiful shot!"
             pulse_change = 35
             self.momentum += 8
             self.pressure -= 5
             self.win_prob += 4
         elif event_type == "0":
-            description = "Dot ball. The bowler is applying immense pressure."
+            description = "Dot ball. Pressure is building up."
             self.pressure += 4
             pulse_change = -8
             self.momentum -= 2
@@ -59,12 +66,12 @@ class MatchSimulator:
             if event_type.isdigit():
                 runs = int(event_type)
                 self.score += runs
-                description = f"{runs} run(s) taken. Building the innings."
+                description = f"{runs} run(s) taken. Keeping the scoreboard ticking."
                 pulse_change = 8 * runs
                 self.momentum += runs
             else:
                 self.score += 1
-                description = "EXTRA! Pressure error from the bowler."
+                description = "EXTRA! Bowler loses control."
                 pulse_change = 5
                 self.momentum += 2
         
@@ -75,13 +82,9 @@ class MatchSimulator:
                 self.balls = 0
                 self.overs += 1
         
-        # Win Prob logic based on RRR
-        runs_left = self.target - self.score
-        balls_left = (20 - self.overs) * 6 - self.balls
-        if balls_left > 0:
-            rrr = (runs_left / balls_left) * 6
-            if rrr > 12: self.win_prob -= 2
-            elif rrr < 8: self.win_prob += 2
+        # Clamp Score/Wickets
+        if self.score > 250: self.score = 250
+        if self.wickets > 10: self.wickets = 10
         
         # Atmosphere Logic
         atmosphere = "Stable"
@@ -90,10 +93,16 @@ class MatchSimulator:
         elif self.pressure > 70: atmosphere = "TENSE"
         elif self.crowd_pulse < 30: atmosphere = "QUIET"
 
+        # Win Prob logic based on RRR
+        balls_left = (20 - self.overs) * 6 - self.balls
+        runs_left = self.target - self.score
+        if balls_left > 0:
+            rrr = (runs_left / balls_left) * 6
+            self.win_prob = max(1, min(99, 100 - (rrr * 6))) # Simplified RRR dependency
+        
         # Clamp values
         self.crowd_pulse = max(0, min(100, self.crowd_pulse + pulse_change))
         self.momentum = max(0, min(100, self.momentum + (pulse_change / 3)))
-        self.win_prob = max(1, min(99, self.win_prob))
         self.pressure = max(0, min(100, self.pressure + random.randint(-3, 3)))
 
         match_state = {
@@ -111,12 +120,4 @@ class MatchSimulator:
             "timestamp": time.time()
         }
         
-        self.history.append(match_state)
         return match_state
-
-# For testing
-if __name__ == "__main__":
-    sim = MatchSimulator()
-    for _ in range(10):
-        print(sim.get_event())
-        time.sleep(1)
