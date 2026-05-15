@@ -112,7 +112,7 @@ body {
   color: rgba(255,255,255,0.35);
   font-family: 'Orbitron', sans-serif;
 }
-.score-value   { font-size: 2.6rem; font-weight: 900; font-family: 'Orbitron', sans-serif; }
+.score-value   { font-size: 2.6rem; font-weight: 900; font-family: 'Orbitron', sans-serif; letter-spacing: 4px; }
 .overs-value   { font-size: 1.5rem; font-weight: 700; font-family: 'Orbitron', sans-serif; color: var(--neon-cyan); }
 .target-value  { font-size: 1.3rem; font-weight: 700; font-family: 'Orbitron', sans-serif; color: var(--neon-pink); }
 .header-target { display: flex; align-items: center; gap: 12px; text-align: right; }
@@ -264,6 +264,7 @@ body {
   border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.03);
   cursor: pointer;
+  color: var(--text-primary);
   font-size: 0.75rem;
   font-weight: 600;
   text-align: center;

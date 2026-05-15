@@ -12,7 +12,6 @@ load_dotenv()
 
 app = FastAPI()
 
-# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,68 +19,83 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Gemini Client
-API_KEY = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=API_KEY) if API_KEY else None
+# ── Clients ──────────────────────────────────────────────────────────────────
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+gemini_client  = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+simulator      = MatchSimulator()
 
-simulator = MatchSimulator()
+print("[CrowdPulse AI] Mode: Simulation (CSK vs LSG)")
 
-async def generate_ai_commentary(match_state: dict):
-    if not client:
+# ── Gemini: Multilingual commentary for simulator ────────────────────────────
+async def gemini_commentary_simulator(match_state: dict) -> dict:
+    if not gemini_client:
         return {
-            "en": f"Standard Commentary: {match_state['description']}",
-            "hi": f"साधारण कमेंट्री: {match_state['description']}",
-            "ta": f"சாதாரண வர்ணனை: {match_state['description']}"
+            "en": f"Match Update: {match_state['description']}",
+            "hi": f"मैच अपडेट: {match_state['description']}",
+            "ta": f"மேட்ச் அப்டேட்: {match_state['description']}",
         }
-    
-    prompt = f"""
-    You are an energetic cricket commentator for CrowdPulse AI. 
-    Match State: {match_state['teams']}, Score: {match_state['score']}, Overs: {match_state['overs']}, Event: {match_state['description']}.
-    Current Momentum: {match_state['momentum']}%, Crowd Pulse: {match_state['crowd_pulse']}%.
-    
-    Provide a very short, punchy, futuristic commentary (1 sentence) in 3 languages: English, Hindi (Hinglish/Devanagari), and Tamil.
-    Format as JSON: {{"en": "...", "hi": "...", "ta": "..."}}
-    """
-    
+
+    prompt = f"""You are CrowdPulse AI — an electrifying IPL 2026 commentator for CSK vs LSG.
+
+Match State: {match_state['teams']}, Score: {match_state['score']}, Overs: {match_state['overs']}.
+Target: 185, RRR: {match_state.get('rrr', '—')}
+Event: {match_state['description']}
+Momentum: {match_state['momentum']}%, Crowd Pulse: {match_state['crowd_pulse']}%
+
+Write ONE short, punchy, dramatic IPL commentary snippet (max 12 words) in 3 languages:
+- English (en): dramatic broadcast style (mentioning Dhoni, Gaikwad, or Rahul if applicable)
+- Hindi (hi): Hinglish mix ( passionate style )
+- Tamil (ta): Passionate Tamil style (e.g. 'Aatam arambam!')
+
+Respond ONLY with valid JSON:
+{{"en": "...", "hi": "...", "ta": "..."}}"""
+
     try:
-        response = client.models.generate_content(
+        response = gemini_client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt,
-            config={
-                'response_mime_type': 'application/json'
-            }
+            config={"response_mime_type": "application/json"},
         )
         return json.loads(response.text)
     except Exception as e:
-        print(f"Gemini Error: {e}")
-        return {"en": match_state['description'], "hi": "त्रुटि", "ta": "பிழை"}
+        print(f"[Gemini] Commentary error: {e}")
+        return {"en": match_state["description"], "hi": "...", "ta": "..."}
 
 @app.get("/")
 async def root():
-    return {"message": "CrowdPulse AI Backend is Running"}
+    return {"message": "CrowdPulse AI Backend Running (Simulator Mode)"}
 
 @app.websocket("/ws/match")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    print("[WS] Client connected")
+
     try:
         while True:
-            # Simulate match event
-            match_state = simulator.get_event()
+            # ── SIMULATOR MODE ──
+            sim_state = simulator.get_event()
             
+            # Add RRR calculation for frontend
+            runs = int(sim_state["score"].split("/")[0])
+            overs = float(sim_state["overs"])
+            runs_left = 185 - runs
+            overs_left = 20 - overs
+            rrr = round(runs_left / (overs_left if overs_left > 0 else 0.1), 1)
+            sim_state["rrr"] = rrr if runs_left > 0 else 0
+
             # Generate AI commentary
-            commentary = await generate_ai_commentary(match_state)
-            match_state["commentary"] = commentary
+            commentary = await gemini_commentary_simulator(sim_state)
+            sim_state["commentary"] = commentary
             
-            # Send to frontend
-            await websocket.send_json(match_state)
+            await websocket.send_json(sim_state)
             
-            # Wait for next ball (randomized for simulation feel)
-            await asyncio.sleep(random.uniform(3.0, 6.0))
-            
+            # Real-time pacing
+            await asyncio.sleep(random.uniform(4.0, 7.0))
+
     except WebSocketDisconnect:
-        print("Client disconnected")
+        print("[WS] Client disconnected")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"[WS] Error: {e}")
 
 if __name__ == "__main__":
     import uvicorn
