@@ -49,7 +49,7 @@ function App() {
     ws.current.onmessage = (e) => {
       const data = JSON.parse(e.data);
       setMatchData(data);
-      setHistory(prev => [...prev, { overs: data.overs, win_prob: data.win_prob }].slice(-30));
+      setHistory(prev => [...prev, data].slice(-30));
       setSentiment({
         positive: Math.min(90, Math.max(20, Math.round(40 + data.win_prob * 0.4 + Math.random() * 8))),
         neutral:  Math.round(15 + Math.random() * 15),
